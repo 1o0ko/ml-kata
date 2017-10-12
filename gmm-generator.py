@@ -39,7 +39,7 @@ class GmmGenerator(object):
                 verbose=self.verbose
             )
 
-            self.params[y] = gmm.fit(X)
+            self.params[y] = gmm.fit(X_y)
             self.prob[y] = len(X_y) / len(X)
 
         return self
