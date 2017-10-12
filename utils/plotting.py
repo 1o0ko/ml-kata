@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 from utils.data import Counter
 
 def plot_sample(gen):
-    sample, y = gen.sample()
+    sample, _ = gen.sample()
     plt.imshow(sample, cmap='gray')
-    plt.title("Random Sample from Random Class [%s]" % y)
+    plt.title("Random Sample from Random Class")
     plt.axis('off')
     plt.show()
 
@@ -13,8 +13,7 @@ def plot_sample(gen):
 def plot_class_samples(gen):
     plot_number = Counter()
     for y in range(gen.num_classes):
-        sample, _ = gen.sample(y)
-        mean = gen.params[y]['mean'].reshape(28, 28)
+        sample, mean = gen.sample(y)
 
         plt.subplot(gen.num_classes, 2, plot_number.value())
         plt.imshow(sample, cmap='gray')

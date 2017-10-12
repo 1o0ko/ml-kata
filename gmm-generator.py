@@ -1,5 +1,5 @@
 '''
-Usage: gaussian-generator.py PATH [options]
+Usage: gmm-generator.py PATH [options]
 
 Arguments:
     PATH    path to example file
@@ -12,13 +12,16 @@ import numpy as np
 
 from utils.data import get_mnist, StandardScaller
 from utils.plotting import plot_sample, plot_class_samples
+
 from typeopt import Arguments
+from sklearn.mixture import BayesianGaussianMixture
 
 
-class GaussianGenerator(object):
+class GmmGenerator(object):
 
-    def __init__(self):
+    def __init__(self, n_components=10):
         self.params = {}
+        self.n_components = n_components
 
     def fit(self, X, Y):
         ''' fit the gaussians '''
@@ -26,11 +29,9 @@ class GaussianGenerator(object):
         self.prob = np.zeros(self.num_classes)
         for y in range(self.num_classes):
             X_y = X[np.where(Y == y)]
-            self.params[y] = {
-                "mean": np.mean(X_y, axis=0),
-                "covarience": np.cov(X_y.T)
-            }
-
+            print('Fitting GMM')
+            gmm = BayesianGaussianMixture(self.n_components)
+            self.params[y] = gmm.fit(X)
             self.prob[y] = len(X_y) / len(X)
 
         return self
@@ -48,16 +49,11 @@ class GaussianGenerator(object):
         if not y:
             y = np.random.choice(self.num_classes, p=self.prob)
 
-        sample = np.random.multivariate_normal(
-            mean=self.params[y]['mean'],
-            cov=self.params[y]['covarience'])
-
-        mean = self.params[y]['mean']
-
+        sample, z = self.params[y].sample()
+        mean = self.params[y].means_[z]
         if shape:
             sample = np.reshape(sample, shape)
             mean = np.reshape(mean, shape)
-
         return sample, mean
 
 
@@ -72,8 +68,8 @@ if __name__ == '__main__':
         print("Normalize data")
         X = StandardScaller().fit(X).transform(X)
 
-    print('Training GaussianGenerator')
-    generator = GaussianGenerator()
+    print('Training GmmGenerator')
+    generator = GmmGenerator()
     generator = generator.fit(X, Y)
 
     # Plotting

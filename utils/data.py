@@ -2,6 +2,16 @@ import numpy as np
 import pandas as pd
 
 
+class StandardScaller(object):
+
+    def fit(self, X):
+        self.mean = np.mean(X, axis=0)
+        return self
+
+    def transform(self, X):
+        return X - self.mean 
+
+
 class Counter():
     def __init__(self, i=0):
         self.i = i
