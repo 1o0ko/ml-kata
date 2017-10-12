@@ -13,7 +13,8 @@ def plot_sample(gen):
 def plot_class_samples(gen):
     plot_number = Counter()
     for y in range(gen.num_classes):
-        sample, mean = gen.sample(y)
+        print("Sampling from class: %i" % y)
+        sample, mean = gen.sample_from_class(y)
 
         plt.subplot(gen.num_classes, 2, plot_number.value())
         plt.imshow(sample, cmap='gray')
