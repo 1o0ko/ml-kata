@@ -6,6 +6,10 @@ Arguments:
 
 Options:
     -l, --limit=<int>           Limit on the number of parsed lines
+    -n, --n-components=<int>    Number of gaussians for each mixture
+                                [default: 5]
+    --log-level=<int>           Log level :)
+                                [default: 0]
     --scale-data                Boolean flag if one should scale data
 '''
 import numpy as np
@@ -19,8 +23,9 @@ from sklearn.mixture import BayesianGaussianMixture
 
 class GmmGenerator(object):
 
-    def __init__(self, n_components=10):
+    def __init__(self, n_components=10, verbose=0):
         self.params = {}
+        self.verbose = verbose
         self.n_components = n_components
 
     def fit(self, X, Y):
@@ -29,18 +34,15 @@ class GmmGenerator(object):
         self.prob = np.zeros(self.num_classes)
         for y in range(self.num_classes):
             X_y = X[np.where(Y == y)]
-            print('Fitting GMM')
-            gmm = BayesianGaussianMixture(self.n_components)
+            gmm = BayesianGaussianMixture(
+                self.n_components,
+                verbose=self.verbose
+            )
+
             self.params[y] = gmm.fit(X)
             self.prob[y] = len(X_y) / len(X)
 
         return self
-
-    def predict(self, X):
-        '''
-        Predicts the most probable class
-        '''
-        pass
 
     def sample(self, y=None, shape=(28, 28)):
         '''
@@ -51,9 +53,11 @@ class GmmGenerator(object):
 
         sample, z = self.params[y].sample()
         mean = self.params[y].means_[z]
+
         if shape:
             sample = np.reshape(sample, shape)
             mean = np.reshape(mean, shape)
+
         return sample, mean
 
 
@@ -69,7 +73,7 @@ if __name__ == '__main__':
         X = StandardScaller().fit(X).transform(X)
 
     print('Training GmmGenerator')
-    generator = GmmGenerator()
+    generator = GmmGenerator(args.n_components, args.log_level)
     generator = generator.fit(X, Y)
 
     # Plotting

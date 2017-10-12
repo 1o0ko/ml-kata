@@ -35,12 +35,6 @@ class GaussianGenerator(object):
 
         return self
 
-    def predict(self, X):
-        '''
-        Predicts the most probable class
-        '''
-        pass
-
     def sample(self, y=None, shape=(28, 28)):
         '''
         Samples from trained distributions
@@ -51,7 +45,6 @@ class GaussianGenerator(object):
         sample = np.random.multivariate_normal(
             mean=self.params[y]['mean'],
             cov=self.params[y]['covarience'])
-
         mean = self.params[y]['mean']
 
         if shape:
