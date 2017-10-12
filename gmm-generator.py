@@ -44,6 +44,11 @@ class GmmGenerator(object):
 
         return self
 
+    def sample(self, shape=(28, 28)):
+        ''' Samples from trained distributions'''
+        y = np.random.choice(self.num_classes, p=self.prob)
+        return self.sample_from_class(y, shape)
+
     def sample_from_class(self, y, shape=(28, 28)):
         sample, z = self.params[y].sample()
         mean = self.params[y].means_[z]
@@ -53,11 +58,6 @@ class GmmGenerator(object):
             mean = np.reshape(mean, shape)
 
         return sample, mean
-
-    def sample(self, shape=(28, 28)):
-        ''' Samples from trained distributions'''
-        y = np.random.choice(self.num_classes, p=self.prob)
-        return self.sample_from_class(y, shape)
 
 
 if __name__ == '__main__':
