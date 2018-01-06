@@ -12,4 +12,4 @@ Repository containing sketches/brain-dead simple implementations of various ML a
 * [Gaussian Mixture Generative Model on MNIST](gmm-generator.py)
 
 ## CV
-* [Convolve an image with filter](convolve.py)
+* [Convolve an image with a filter](convolve.py)
