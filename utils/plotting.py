@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 
 from utils.data import Counter
 
+
 def plot_sample(gen):
     sample, _ = gen.sample()
     plt.imshow(sample, cmap='gray')

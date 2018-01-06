@@ -9,7 +9,7 @@ class StandardScaller(object):
         return self
 
     def transform(self, X):
-        return X - self.mean 
+        return X - self.mean
 
 
 class Counter():
@@ -19,6 +19,7 @@ class Counter():
     def value(self):
         self.i += 1
         return self.i
+
 
 def get_mnist(path, shuffle=True, limit=None):
     '''
