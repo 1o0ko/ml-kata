@@ -1,4 +1,4 @@
-# ml-kata
+# 🥋 ml-kata 🥋
 Repository containing sketches/brain-dead simple implementations of various ML algorithms or parts of therof.
 
 ## NLP
