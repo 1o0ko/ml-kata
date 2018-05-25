@@ -49,7 +49,8 @@ class UnigramModel(LanguageModel):
         return ' '.join([self.sample_one_word() for _ in range(n)])
 
     def _prob(self, sentence):
-        return reduce(operator.mul, [self.prob_word(word) for word in sentence])
+        return reduce(operator.mul, [self.prob_word(word)
+                                     for word in sentence])
 
     def prob_word(self, word):
         return self.model.get(word, min(self.model.values()))
@@ -132,7 +133,6 @@ class TriGramModel(LanguageModel):
 
         # naive backoff maybe char level LM?
         return self.unigram_lm(t3)
-
 
 
 if __name__ == '__main__':
