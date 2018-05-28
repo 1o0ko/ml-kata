@@ -6,9 +6,9 @@ def pad_sequence(sequence, n, pad_left=False, pad_right=False,
     ''' padding (from NLTK)'''
     sequence = iter(sequence)
     if pad_left:
-        sequence = chain((left_pad_symbol,) * (n-1), sequence)
+        sequence = chain((left_pad_symbol,) * (n - 1), sequence)
     if pad_right:
-        sequence = chain(sequence, (right_pad_symbol,) * (n-1))
+        sequence = chain(sequence, (right_pad_symbol,) * (n - 1))
     return sequence
 
 
@@ -16,7 +16,7 @@ def ngrams(sequence, n, pad_left=False, pad_right=False,
            left_pad_symbol=None, right_pad_symbol=None):
     ''' Create ngrams (from NLTK)'''
     sequence = pad_sequence(sequence, n, pad_left, pad_right,
-                        left_pad_symbol, right_pad_symbol)
+                            left_pad_symbol, right_pad_symbol)
 
     history = []
     while n > 1:

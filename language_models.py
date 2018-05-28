@@ -8,6 +8,7 @@ from functools import reduce
 from nltk.corpus import reuters
 from utils.language import trigrams
 
+
 class LanguageModel(abc.ABC):
     def __call__(self, sentence):
         return self.prob(sentence)
@@ -75,7 +76,7 @@ class TriGramModel(LanguageModel):
 
         for sentence in corpus.sents():
             for w1, w2, w3 in trigrams(
-                sentence, pad_right=True, pad_left=True):
+                    sentence, pad_right=True, pad_left=True):
                 self.model[(w1, w2)][w3] += 1
 
         # Let's transform the counts to probabilities
