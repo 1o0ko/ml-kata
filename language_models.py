@@ -141,7 +141,10 @@ if __name__ == '__main__':
     print('A sample from the model')
     print(trigram_lm.sample())
 
-    p_1 = trigram_lm('This is a sentence')
-    p_2 = trigram_lm('Fishes like brown music')
+    hi_p_sent = 'This is a sentence'
+    lo_p_sent = 'Fishes like brown music'
+    p_1 = trigram_lm(hi_p_sent)
+    p_2 = trigram_lm(lo_p_sent)
 
+    print(f"{hi_p_sent}: {p_1}, {lo_p_sent}: {p_2}")
     assert p_1 > p_2
