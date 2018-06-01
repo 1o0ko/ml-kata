@@ -42,7 +42,8 @@ def trigrams(sequence, **kwargs):
 class Corpus(object):
     ''' Corpus object '''
     def __init__(self, sentences):
-        self._sentences = [s.split() for s in sentences]
+        self._sentences = [
+            s.split() if isinstance(s, str) else s for s in sentences]
         self._words = list(chain.from_iterable(self._sentences))
 
     @property
@@ -52,6 +53,9 @@ class Corpus(object):
     @property
     def sents(self):
         return self._sentences
+
+    def __add__(self, other):
+        return Corpus(chain(self.sents, other.sents))
 
 
 class LanguageModel(abc.ABC):
@@ -95,7 +99,8 @@ class UnigramModel(LanguageModel):
 
     def _prob(self, sentence):
         ''' calculate the probaility of the sequence '''
-        # eric: logspace addition is usually more stable, in case you ever have small probs...
+        # eric: logspace addition is usually more stable,
+        #       in case you ever have small probs...
         return np.exp(np.sum(np.log([
             self.prob_word(word) for word in sentence])))
 
