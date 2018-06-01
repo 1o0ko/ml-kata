@@ -1,12 +1,57 @@
 import abc
-import operator
 import random
+import numpy as np
 
 from collections import Counter, defaultdict
-from functools import reduce
+from itertools import chain
 
-from nltk.corpus import reuters
-from utils.language import trigrams
+
+def pad_sequence(sequence, n, pad_left=False, pad_right=False,
+                 left_pad_symbol=None, right_pad_symbol=None):
+    ''' padding (from NLTK)'''
+    sequence = iter(sequence)
+    if pad_left:
+        sequence = chain((left_pad_symbol,) * (n - 1), sequence)
+    if pad_right:
+        sequence = chain(sequence, (right_pad_symbol,) * (n - 1))
+    return sequence
+
+
+def ngrams(sequence, n, pad_left=False, pad_right=False,
+           left_pad_symbol=None, right_pad_symbol=None):
+    ''' Create ngrams (from NLTK)'''
+    sequence = pad_sequence(sequence, n, pad_left, pad_right,
+                            left_pad_symbol, right_pad_symbol)
+
+    history = []
+    while n > 1:
+        history.append(next(sequence))
+        n -= 1
+    for item in sequence:
+        history.append(item)
+        yield tuple(history)
+        del history[0]
+
+
+def trigrams(sequence, **kwargs):
+    ''' Return trigrams generated from a sequence  (from NLTK)'''
+    for item in ngrams(sequence, 3, **kwargs):
+        yield item
+
+
+class Corpus(object):
+    ''' Corpus object '''
+    def __init__(self, sentences):
+        self._sentences = [s.split() for s in sentences]
+        self._words = list(chain.from_iterable(self._sentences))
+
+    @property
+    def words(self):
+        return self._words
+
+    @property
+    def sents(self):
+        return self._sentences
 
 
 class LanguageModel(abc.ABC):
@@ -26,9 +71,9 @@ class LanguageModel(abc.ABC):
         pass
 
     def prob(self, sentence):
-        if not isinstance(sentence, list) and isinstance(sentence, str):
+        if isinstance(sentence, str):
             sentence = sentence.split()
-        else:
+        elif not isinstance(sentence, list):
             raise ValueError("Not a sting or list!")
 
         return self._prob(sentence)
@@ -36,22 +81,27 @@ class LanguageModel(abc.ABC):
 
 class UnigramModel(LanguageModel):
 
-    def fit(self, corupus):
-        self.model = Counter(corupus.words())
-        self.total_count = len(corupus.words())
+    def fit(self, corpus):
+        self.model = Counter(corpus.words)
+        self.total_count = len(corpus.words)
 
         for word in self.model:
             self.model[word] /= float(self.total_count)
+
+        self.min_prob = min(self.model.values())
 
     def sample(self, n=10):
         return ' '.join([self.sample_one_word() for _ in range(n)])
 
     def _prob(self, sentence):
-        return reduce(operator.mul, [self.prob_word(word)
-                                     for word in sentence])
+        ''' calculate the probaility of the sequence '''
+        # eric: logspace addition is usually more stable, in case you ever have small probs...
+        return np.exp(np.sum(np.log([
+            self.prob_word(word) for word in sentence])))
 
     def prob_word(self, word):
-        return self.model.get(word, min(self.model.values()))
+        ''' calculate the probability of a word '''
+        return self.model.get(word, self.min_prob)
 
     def sample_one_word(self):
         r = random.random()
@@ -72,9 +122,9 @@ class TriGramModel(LanguageModel):
         self.unigram_lm.fit(corpus)
 
         # dict of dicts
-        self.model = defaultdict(lambda: defaultdict(lambda: 0))
+        self.model = defaultdict(lambda: defaultdict(float))
 
-        for sentence in corpus.sents():
+        for sentence in corpus.sents:
             for w1, w2, w3 in trigrams(
                     sentence, pad_right=True, pad_left=True):
                 self.model[(w1, w2)][w3] += 1
@@ -87,7 +137,7 @@ class TriGramModel(LanguageModel):
 
     def sample(self, n=None):
         '''
-        Gready sampling from a trigram model
+        Greedy sampling from a trigram model
         '''
         text = [None, None]
         sentence_finished = False
@@ -118,9 +168,10 @@ class TriGramModel(LanguageModel):
         Naive probability of a sentence with an unigram back-off
         '''
         probs = [
-            self.prob_trigram(t) for t in trigrams(sentence, pad_left=True)]
+            self.prob_trigram(t) for t in trigrams(sentence, pad_left=True)
+        ]
 
-        return reduce(operator.mul, probs)
+        return np.exp(np.sum(np.log(probs)))
 
     def prob_trigram(self, trigram):
         ''' P(t_3 | t_2, t1) '''
@@ -134,9 +185,18 @@ class TriGramModel(LanguageModel):
 
 
 if __name__ == '__main__':
+    corpus = Corpus([
+        'this is a sentence',
+        'this sentence is long',
+        'fishes like to swim',
+        'Brown corpus is a resource',
+        'I like listening to music',
+        'this is a really long sentence'
+    ])
+
     print('Training a LM')
     trigram_lm = TriGramModel()
-    trigram_lm.fit(reuters)
+    trigram_lm.fit(corpus)
 
     print('A sample from the model')
     print(trigram_lm.sample())
