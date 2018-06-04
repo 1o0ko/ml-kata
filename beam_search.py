@@ -109,6 +109,5 @@ if __name__ == '__main__':
     lm.fit(reuters)
 
     seq, prob = beamsearch(lm.probs, clip_len=-1)
-    import ipdb; ipdb.set_trace()
     print(seq, prob, lm.probs(seq))
     print(beamsearch(lm.probs, seed=['the', 'man'], clip_len=-1))
