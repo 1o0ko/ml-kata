@@ -34,7 +34,7 @@ def ngrams(sequence, n, pad_left=False, pad_right=False,
 
 
 def trigrams(sequence, **kwargs):
-    ''' Return trigrams generated from a sequence  (from NLTK)'''
+    ''' Return trigrams generated from a sequence '''
     for item in ngrams(sequence, 3, **kwargs):
         yield item
 
@@ -71,16 +71,39 @@ class LanguageModel(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _prob(self, sentence):
+    def probs(self, sentence):
+        ''' Returns the list of tokens and their probabilities
+
+        [(t_1, p(t_1)), ... , (t_N, p(t_N))]
+        '''
+
         pass
 
-    def prob(self, sentence):
+    def __check(self, sentence):
         if isinstance(sentence, str):
             sentence = sentence.split()
         elif not isinstance(sentence, list):
             raise ValueError("Not a sting or list!")
+        return sentence
 
-        return self._prob(sentence)
+    def prob(self, sentence):
+        ''' Calculates probability of the sentence W = (w_1, ..., w_N)
+
+        P(W) = P((w_1, w_2, ..., w_N))
+
+        Uses log-probabilities
+        '''
+        return np.exp(np.sum(np.log(
+            [p for (t, p) in self.probs(self.__check(sentence))]
+        )))
+
+    def perplexity(self, sentence):
+        ''' Calculates perplexity of the sentence W = (w_1, ..., w_N)
+
+        PP(W) = P((w_1, w_2, ..., w_N)) ^ (- 1 / N)
+        '''
+        sentence = self.__check(sentence)
+        return np.power(1 / self.prob(sentence), 1 / len(sentence))
 
 
 class UnigramModel(LanguageModel):
@@ -97,12 +120,9 @@ class UnigramModel(LanguageModel):
     def sample(self, n=10):
         return ' '.join([self.sample_one_word() for _ in range(n)])
 
-    def _prob(self, sentence):
-        ''' calculate the probaility of the sequence '''
-        # eric: logspace addition is usually more stable,
-        #       in case you ever have small probs...
-        return np.exp(np.sum(np.log([
-            self.prob_word(word) for word in sentence])))
+    def probs(self, sentence):
+        '''Returns list of tuples of (word, it's probability)'''
+        return [(word, self.prob_word(word)) for word in sentence]
 
     def prob_word(self, word):
         ''' calculate the probability of a word '''
@@ -123,7 +143,7 @@ class TriGramModel(LanguageModel):
         self.unigram_lm = UnigramModel()
 
     def fit(self, corpus):
-        # for unigram backoff
+        # for unigram back-off
         self.unigram_lm.fit(corpus)
 
         # dict of dicts
@@ -167,25 +187,25 @@ class TriGramModel(LanguageModel):
 
         return ' '.join([t for t in text if t])
 
-    def _prob(self, sentence):
-        ''' P([w1, w2, ..., wN])
+    def probs(self, sentence):
+        ''' List of tuples: trigram, it's probability with unigram back-off
 
-        Naive probability of a sentence with an unigram back-off
-        '''
-        probs = [
-            self.prob_trigram(t) for t in trigrams(sentence, pad_left=True)
+        [
+         ((w_1,     w_2,     w_3), P(w_3 | w_2, w_1)), ... ,
+         ((w_(N-2), w_(N-1), w_N), P(w_3 | w_2, w_1))
         ]
-
-        return np.exp(np.sum(np.log(probs)))
+        '''
+        return [(t, self.prob_trigram(t))
+                for t in trigrams(sentence, pad_left=True)]
 
     def prob_trigram(self, trigram):
-        ''' P(t_3 | t_2, t1) '''
+        ''' P(t_3 | t_2, t_1) with unigram back-off
+        '''
         (t1, t2, t3) = trigram
         items = self.model.get((t1, t2), None)
         if items and t3 in items:
             return items[t3]
 
-        # naive backoff maybe char level LM?
         return self.unigram_lm(t3)
 
 
