@@ -8,6 +8,7 @@ from nltk.corpus import reuters
 from nltk import trigrams
 from collections import Counter, defaultdict
 
+START = '<START>'
 END = '<END>'
 
 
@@ -17,7 +18,8 @@ class TriGramModel(object):
         self.model = defaultdict(lambda: defaultdict(lambda: 0))
 
         for sentence in corpus.sents():
-            for w1, w2, w3 in trigrams(sentence + [END], pad_left=True):
+            for w1, w2, w3 in trigrams(
+                sentence + [END], pad_left=True, left_pad_symbol=START):
                 self.model[(w1, w2)][w3] += 1
 
         # Let's transform the counts to probabilities
@@ -28,7 +30,7 @@ class TriGramModel(object):
 
     def probs(self, sequence):
         while len(sequence) < 2:
-            sequence.insert(0, None)
+            sequence.insert(0, START)
 
         w1_w2 = tuple(sequence[-2:])
         if w1_w2 in self.model:
@@ -66,7 +68,7 @@ class Beam(object):
 
 def beamsearch(
         probabilities_function,
-        seed=[None, None],
+        seed=[START, START],
         beam_width=10, clip_len=-1,
         end_token=END):
     '''
@@ -106,5 +108,6 @@ if __name__ == '__main__':
     lm = TriGramModel()
     lm.fit(reuters)
 
-    print(beamsearch(lm.probs, clip_len=-1))
+    seq, prob = beamsearch(lm.probs, clip_len=-1)
+    print(seq, prob, lm.probs(seq))
     print(beamsearch(lm.probs, seed=['the', 'man'], clip_len=-1))

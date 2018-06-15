@@ -93,49 +93,48 @@ class HighwayLayer(object):
         # calculate output layer
         return t * self.g(self.A_h(y)) + (1 - t) * y
 
-# Model hyperparameters
 
+if __name__ == '__main__':
+    # char embedding size
+    d = 15
 
-# char embedding size
-d = 15
+    # target word embedding size
+    D = 100
 
-# target word embedding size
-D = 100
+    # sample char vocabulary
+    c2i = {chr(i): index for index, i in enumerate(range(ord('a'), ord('z') + 1))}
 
-# sample char vocabulary
-c2i = {chr(i): index for index, i in enumerate(range(ord('a'), ord('z') + 1))}
+    # sample char embeddings
+    char_embeddings = 0.001 * np.random.random((len(c2i), d))
 
-# sample char embeddings
-char_embeddings = 0.001 * np.random.random((len(c2i), d))
+    # filter sizes
+    w_sizes = [1, 2, 3, 4, 5, 6]
 
-# filter sizes
-w_sizes = [1, 2, 3, 4, 5, 6]
+    # how many times should we replicate the filters to obtain the word
+    # embedding of approriate size
+    w_n = 100 // len(w_sizes)
 
-# how many times should we replicate the filters to obtain the word
-# embedding of approriate size
-w_n = 100 // len(w_sizes)
+    # Create filters
+    filters = [np.random.random((d, w))
+               for w_size in w_sizes
+               for w in w_n * [w_size]]
 
-# Create filters
-filters = [np.random.random((d, w))
-           for w_size in w_sizes
-           for w in w_n * [w_size]]
+    if len(filters) < D:
+        filters.extend([np.random.random((d, w))
+                        for w in random.choices(w_sizes, k=D - len(filters))])
 
-if len(filters) < D:
-    filters.extend([np.random.random((d, w))
-                    for w in random.choices(w_sizes, k=D - len(filters))])
+    sentence = "I think this is stupid , but necessary"
 
-sentence = "I think this is stupid , but necessary"
+    highway = HighwayLayer(D)
 
-highway = HighwayLayer(D)
+    for word in tokenize(sentence, c2i):
+        C = get_word_matrix(word, char_embeddings)
 
-for word in tokenize(sentence, c2i):
-    C = get_word_matrix(word, char_embeddings)
+        # apply 'max-pooling over time' to get one float for filter.
+        W = np.array([np.max(np.tanh(convolve(C, H) + 0.01))
+                      for H in filters]).reshape(-1, 1)
+        W = highway(W)
 
-    # apply 'max-pooling over time' to get one float for filter.
-    W = np.array([np.max(np.tanh(convolve(C, H) + 0.01))
-                  for H in filters]).reshape(-1, 1)
-    W = highway(W)
-
-    print("---")
-    print("C: %s, %s" % C.shape)
-    print("W: %s, %s" % W.shape)
+        print("---")
+        print("C: %s, %s" % C.shape)
+        print("W: %s, %s" % W.shape)

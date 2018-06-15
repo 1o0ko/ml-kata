@@ -1,32 +1,132 @@
-# Beam Search
-
-from nltk.corpus import reuters
-from nltk import trigrams
-from collections import Counter, defaultdict
-
+import abc
 import random
+import numpy as np
+
+from collections import Counter, defaultdict
+from itertools import chain
 
 
-class LanguageModel(object):
+def pad_sequence(sequence, n, pad_left=False, pad_right=False,
+                 left_pad_symbol=None, right_pad_symbol=None):
+    ''' padding (from NLTK)'''
+    sequence = iter(sequence)
+    if pad_left:
+        sequence = chain((left_pad_symbol,) * (n - 1), sequence)
+    if pad_right:
+        sequence = chain(sequence, (right_pad_symbol,) * (n - 1))
+    return sequence
 
+
+def ngrams(sequence, n, pad_left=False, pad_right=False,
+           left_pad_symbol=None, right_pad_symbol=None):
+    ''' Create ngrams (from NLTK)'''
+    sequence = pad_sequence(sequence, n, pad_left, pad_right,
+                            left_pad_symbol, right_pad_symbol)
+
+    history = []
+    while n > 1:
+        history.append(next(sequence))
+        n -= 1
+    for item in sequence:
+        history.append(item)
+        yield tuple(history)
+        del history[0]
+
+
+def trigrams(sequence, **kwargs):
+    ''' Return trigrams generated from a sequence '''
+    for item in ngrams(sequence, 3, **kwargs):
+        yield item
+
+
+class Corpus(object):
+    ''' Corpus object '''
+    def __init__(self, sentences):
+        self._sentences = [
+            s.split() if isinstance(s, str) else s for s in sentences]
+        self._words = list(chain.from_iterable(self._sentences))
+
+    @property
+    def words(self):
+        return self._words
+
+    @property
+    def sents(self):
+        return self._sentences
+
+    def __add__(self, other):
+        return Corpus(chain(self.sents, other.sents))
+
+
+class LanguageModel(abc.ABC):
+    def __call__(self, sentence):
+        return self.prob(sentence)
+
+    @abc.abstractmethod
     def fit(self, corpus):
         pass
 
+    @abc.abstractmethod
     def sample(self, n=10):
         pass
+
+    @abc.abstractmethod
+    def probs(self, sentence):
+        ''' Returns the list of tokens and their probabilities
+
+        [(t_1, p(t_1)), ... , (t_N, p(t_N))]
+        '''
+
+        pass
+
+    def __check(self, sentence):
+        if isinstance(sentence, str):
+            sentence = sentence.split()
+        elif not isinstance(sentence, list):
+            raise ValueError("Not a sting or list!")
+        return sentence
+
+    def prob(self, sentence):
+        ''' Calculates probability of the sentence W = (w_1, ..., w_N)
+
+        P(W) = P((w_1, w_2, ..., w_N))
+
+        Uses log-probabilities
+        '''
+        return np.exp(np.sum(np.log(
+            [p for (t, p) in self.probs(self.__check(sentence))]
+        )))
+
+    def perplexity(self, sentence):
+        ''' Calculates perplexity of the sentence W = (w_1, ..., w_N)
+
+        PP(W) = P((w_1, w_2, ..., w_N)) ^ (- 1 / N)
+        '''
+        sentence = self.__check(sentence)
+        return np.power(1 / self.prob(sentence), 1 / len(sentence))
 
 
 class UnigramModel(LanguageModel):
 
-    def fit(self, corupus):
-        self.model = Counter(corupus.words())
-        self.total_count = len(corupus.words())
+    def fit(self, corpus):
+        self.model = Counter(corpus.words)
+        self.total_count = len(corpus.words)
 
         for word in self.model:
             self.model[word] /= float(self.total_count)
 
+        self.min_prob = min(self.model.values())
+
     def sample(self, n=10):
         return ' '.join([self.sample_one_word() for _ in range(n)])
+
+    def probs(self, sentence):
+        '''Returns list of tuples of (word, it's probability)'''
+        return [(word, self.prob_word(word)) for word in sentence]
+
+    def prob_word(self, word):
+        ''' calculate the probability of a word '''
+        return self.model.get(word, self.min_prob)
 
     def sample_one_word(self):
         r = random.random()
@@ -38,11 +138,18 @@ class UnigramModel(LanguageModel):
 
 
 class TriGramModel(LanguageModel):
-    def fit(self, corpus):
-        # dict of dicts
-        self.model = defaultdict(lambda: defaultdict(lambda: 0))
 
-        for sentence in corpus.sents():
+    def __init__(self):
+        self.unigram_lm = UnigramModel()
+
+    def fit(self, corpus):
+        # for unigram back-off
+        self.unigram_lm.fit(corpus)
+
+        # dict of dicts
+        self.model = defaultdict(lambda: defaultdict(float))
+
+        for sentence in corpus.sents:
             for w1, w2, w3 in trigrams(
                     sentence, pad_right=True, pad_left=True):
                 self.model[(w1, w2)][w3] += 1
@@ -54,6 +161,9 @@ class TriGramModel(LanguageModel):
                 self.model[w1_w2][w3] /= total_count
 
     def sample(self, n=None):
+        '''
+        Greedy sampling from a trigram model
+        '''
         text = [None, None]
         sentence_finished = False
 
@@ -77,68 +187,49 @@ class TriGramModel(LanguageModel):
 
         return ' '.join([t for t in text if t])
 
+    def probs(self, sentence):
+        ''' List of tuples: trigram, it's probability with unigram back-off
 
-import heapq
+        [
+         ((w_1,     w_2,     w_3), P(w_3 | w_2, w_1)), ... ,
+         ((w_(N-2), w_(N-1), w_N), P(w_3 | w_2, w_1))
+        ]
+        '''
+        return [(t, self.prob_trigram(t))
+                for t in trigrams(sentence, pad_left=True)]
 
+    def prob_trigram(self, trigram):
+        ''' P(t_3 | t_2, t_1) with unigram back-off
+        '''
+        (t1, t2, t3) = trigram
+        items = self.model.get((t1, t2), None)
+        if items and t3 in items:
+            return items[t3]
 
-class Beam(object):
-
-    def __init__(self, beam_width):
-        self.heap = list()
-        self.beam_width = beam_width
-
-    def add(self, prob, complete, prefix):
-        heapq.heappush(self.heap, (prob, complete, prefix))
-        if len(self.heap) > self.beam_width:
-            heapq.heappop(self.heap)
-
-    def __iter__(self):
-        return iter(self.heap)
-
-
-def beamsearch(
-        probabilities_function,
-        beam_width=10,
-        clip_len=-1):
-    '''
-    Performs beam search.
-    '''
-    prev_beam = Beam(beam_width)
-    prev_beam.add(1.0, False, ['<start>'])
-    while True:
-        curr_beam = Beam(beam_width)
-
-        # Add complete sentences that do not yet have the best probability to the current beam,
-        # the rest prepare to add more words to them.
-        for (prefix_prob, complete, prefix) in prev_beam:
-            if complete:
-                curr_beam.add(prefix_prob, True, prefix)
-            else:
-                # Get probability of each possible next word for the incomplete
-                # prefix.
-                for (next_prob, next_word) in probabilities_function(prefix):
-                    if next_word == '<end>':  # if next word is the end token then mark prefix as complete and leave out the end token
-                        curr_beam.add(prefix_prob * next_prob, True, prefix)
-                    else:  # if next word is a non-end token then mark prefix as incomplete
-                        curr_beam.add(
-                            prefix_prob * next_prob, False, prefix + [next_word])
-
-        (best_prob, best_complete, best_prefix) = max(curr_beam)
-        # if most probable prefix is a complete sentence or has a length that
-        # exceeds the clip length (ignoring the start token) then return it
-        if best_complete or len(best_prefix) - 1 == clip_len:
-            # return best sentence without the start token and together with
-            # its probability
-            return (best_prefix[1:], best_prob)
-
-        prev_beam = curr_beam
+        return self.unigram_lm(t3)
 
 
 if __name__ == '__main__':
-    unigram_lm = UnigramModel()
-    unigram_lm.fit(reuters)
-    unigram_lm.sample(5)
+    corpus = Corpus([
+        'this is a sentence',
+        'this sentence is long',
+        'fishes like to swim',
+        'Brown corpus is a resource',
+        'I like listening to music',
+        'this is a really long sentence'
+    ])
 
+    print('Training a LM')
     trigram_lm = TriGramModel()
-    trigram_lm.fit(reuters)
-    trigram_lm.sample()
+    trigram_lm.fit(corpus)
+
+    print('A sample from the model')
+    print(trigram_lm.sample())
+
+    hi_p_sent = 'This is a sentence'
+    lo_p_sent = 'Fishes like brown music'
+    p_1 = trigram_lm(hi_p_sent)
+    p_2 = trigram_lm(lo_p_sent)
+
+    print(f"{hi_p_sent}: {p_1}, {lo_p_sent}: {p_2}")
+    assert p_1 > p_2
