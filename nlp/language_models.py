@@ -4,8 +4,12 @@ import numpy as np
 
 from collections import Counter, defaultdict
 from itertools import chain
+from typing import List, Optional
 
-from nlp.ngrams import trigrams
+from nlp.ngrams import ngrams
+
+Token = Optional[str]
+Seed = Optional[List[Token]]
 
 
 class Corpus(object):
@@ -36,7 +40,7 @@ class LanguageModel(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def sample(self, n=10):
+    def sample(self, k=10):
         pass
 
     @abc.abstractmethod
@@ -86,8 +90,8 @@ class UnigramModel(LanguageModel):
 
         self.min_prob = min(self.model.values())
 
-    def sample(self, n=10):
-        return ' '.join([self.sample_one_word() for _ in range(n)])
+    def sample(self, k=10):
+        return ' '.join([self.sample_one_word() for _ in range(k)])
 
     def probs(self, sentence):
         '''Returns list of tuples of (word, it's probability)'''
@@ -106,76 +110,98 @@ class UnigramModel(LanguageModel):
                 return word
 
 
-class TriGramModel(LanguageModel):
+class NgramModel(LanguageModel):
+    '''
+    Builds a n-gram language model
 
-    def __init__(self):
+    Args:
+        n - order of the n-gram
+    '''
+    def __init__(self, n: int):
+        if n <= 1:
+            raise ValueError("n should be greater than 1")
+
         self.unigram_lm = UnigramModel()
+        self.model = defaultdict(lambda: defaultdict(float))
+        self.n = n
 
     def fit(self, corpus):
         # for unigram back-off
         self.unigram_lm.fit(corpus)
 
-        # dict of dicts
-        self.model = defaultdict(lambda: defaultdict(float))
-
         for sentence in corpus.sents:
-            for w1, w2, w3 in trigrams(
-                    sentence, pad_right=True, pad_left=True):
-                self.model[(w1, w2)][w3] += 1
+            for *hist, word in ngrams(sentence, self.n, pad_right=True, pad_left=True):
+                self.model[tuple(hist)][word] += 1
 
         # Let's transform the counts to probabilities
-        for w1_w2 in self.model:
-            total_count = float(sum(self.model[w1_w2].values()))
-            for w3 in self.model[w1_w2]:
-                self.model[w1_w2][w3] /= total_count
+        # TODO: add smoothing
+        for hist in self.model:
+            total_count = float(sum(self.model[hist].values()))
+            for word in self.model[hist]:
+                self.model[hist][word] /= total_count
 
-    def sample(self, n=None):
-        '''
-        Greedy sampling from a trigram model
-        '''
-        text = [None, None]
+    def sample(self,
+               text: Optional[List[Token]] = None,
+               k: Optional[int] = None):
+        ''' Greedy sampling from a ngram model '''
+        # Initialize context
+        text = text if text else [None] * (self.n - 1)
         sentence_finished = False
 
         while not sentence_finished:
             r = random.random()
             accumulator = .0
 
-            for word, freq in self.model[tuple(text[-2:])].items():
+            history = tuple(text[-(self.n - 1):])
+            for word, freq in self.model[history].items():
                 accumulator += freq
 
                 if accumulator >= r:
                     text.append(word)
                     break
 
-            if n and len(text[2:]) == n:
+            if k and len(text[self.n - 1:]) == k:
                 text.append(".")
                 sentence_finished = True
 
-            if text[-2:] == [None, None]:
+            if text[-(self.n - 1):] == [None] * (self.n - 1):
                 sentence_finished = True
 
         return ' '.join([t for t in text if t])
+
+    def prob_ngram(self, ngram):
+        ''' P(t_n | t_(n-1), ..., t_1) with unigram back-off
+        '''
+        *hist, word = ngram
+        probs = self.model.get(tuple(hist), None)
+        if probs and word in probs:
+            return probs[word]
+
+        return self.unigram_lm(word)
 
     def probs(self, sentence):
         ''' List of tuples: trigram, it's probability with unigram back-off
 
         [
-         ((w_1,     w_2,     w_3), P(w_3 | w_2, w_1)), ... ,
-         ((w_(N-2), w_(N-1), w_N), P(w_3 | w_2, w_1))
+         ((w_1,        w_2,        ..., w_n), P(w_n | w_(n-1), ..., w_1)), ... ,
+         ...
+         ((w_(N-(n-1), w_(N-(n-2), ..., w_N), P(w_n | w_(n-1), ..., w_1)), ... ,
         ]
         '''
-        return [(t, self.prob_trigram(t))
-                for t in trigrams(sentence, pad_left=True)]
+        return [(n, self.prob_ngram(n))
+                for n in ngrams(sentence, self.n, pad_left=True)]
 
-    def prob_trigram(self, trigram):
-        ''' P(t_3 | t_2, t_1) with unigram back-off
-        '''
-        (t1, t2, t3) = trigram
-        items = self.model.get((t1, t2), None)
-        if items and t3 in items:
-            return items[t3]
 
-        return self.unigram_lm(t3)
+class BigramModel(NgramModel):
+    ''' Convinience wrapper '''
+    def __init__(self):
+        super().__init__(2)
+
+
+class TrigramModel(NgramModel):
+    ''' Convinience wrapper '''
+    def __init__(self):
+        super().__init__(3)
 
 
 if __name__ == '__main__':
@@ -185,15 +211,28 @@ if __name__ == '__main__':
         'fishes like to swim',
         'Brown corpus is a resource',
         'I like listening to music',
+        'I like reading music books',
         'this is a really long sentence'
     ])
 
-    print('Training a LM')
-    trigram_lm = TriGramModel()
+    print('Training unigram  LM')
+    unigram_lm = UnigramModel()
+    unigram_lm.fit(corpus)
+    print('\tA sample from the model:', unigram_lm.sample())
+
+    print('Training a bigram LM')
+    bigram_lm = BigramModel()
+    bigram_lm.fit(corpus)
+
+    print('\tA sample from the model:', bigram_lm.sample(k=3))
+    print('\tA sample from the model:', bigram_lm.sample(text=[None, 'I']))
+
+    print('Training a 3-gram LM')
+    trigram_lm = TrigramModel()
     trigram_lm.fit(corpus)
 
-    print('A sample from the model')
-    print(trigram_lm.sample())
+    print('\tA sample from the model:', trigram_lm.sample())
+    print('\tA sample from the model:', trigram_lm.sample(text=[None, 'I']))
 
     hi_p_sent = 'This is a sentence'
     lo_p_sent = 'Fishes like brown music'
