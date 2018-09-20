@@ -225,7 +225,7 @@ if __name__ == '__main__':
     bigram_lm.fit(corpus)
 
     print('\tA sample from the model:', bigram_lm.sample(k=3))
-    print('\tA sample from the model:', bigram_lm.sample(text=[None, 'I']))
+    print('\tA sample from the model:', bigram_lm.sample(text=['I']))
 
     print('Training a 3-gram LM')
     trigram_lm = TrigramModel()
