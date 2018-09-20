@@ -1,7 +1,7 @@
 import collections
 
-from typing import Iterator, Tuple
-from itertools import tee, islice
+from typing import Iterator, Tuple, Optional
+from itertools import tee, islice, chain
 
 
 def consume(iterator, n=None):
@@ -15,7 +15,46 @@ def consume(iterator, n=None):
         next(islice(iterator, n, n), None)
 
 
-def bigrams(iterable: Iterator[str]) -> Iterator[Tuple[str, str]]:
+def pad_sequence(sequence, n, pad_left=False, pad_right=False,
+                 left_pad_symbol=None, right_pad_symbol=None):
+    ''' padding (from NLTK)'''
+    sequence = iter(sequence)
+    if pad_left:
+        sequence = chain((left_pad_symbol,) * (n - 1), sequence)
+    if pad_right:
+        sequence = chain(sequence, (right_pad_symbol,) * (n - 1))
+    return sequence
+
+
+def ngrams(iterable: Iterator[str], n: int,
+           pad_left: bool = False,
+           pad_right: bool = False,
+           left_pad_symbol: Optional[str] = None,
+           right_pad_symbol: Optional[str] = None) -> Iterator[Tuple[str, ...]]:
+    ''' Create n-grams form an interable
+    i -> (i_0, i_1, ..., i_n), (i_1, i_2, ..., i_n+1),  ...
+
+    Example:
+       > for ngram in ngrams(['all', 'this', 'happened', 'more', 'or', 'less'], 3):
+    ...:     print(ngram)
+
+    ('all', 'this', 'happened')
+    ('this', 'happened', 'more')
+    ('happened', 'more', 'or')
+    ('more', 'or', 'less')
+    '''
+    # pad the sequence
+    iterable = pad_sequence(iterable, n, pad_left, pad_right,
+                            left_pad_symbol, right_pad_symbol)
+    # split iterators
+    iters = tee(iterable, n)
+    for skip, i in enumerate(iters):
+        consume(i, skip)
+
+    return zip(*iters)
+
+
+def bigrams(iterable: Iterator[str], **kwargs) -> Iterator[Tuple[str, str]]:
     ''' Create bi-gram form an iterable
     i -> (i0, i1), (i1, i2), (i2, i3), ...
 
@@ -29,26 +68,11 @@ def bigrams(iterable: Iterator[str]) -> Iterator[Tuple[str, str]]:
     ('more', 'or')
     ('or', 'less')
     '''
-    a, b = tee(iterable)
-    consume(b, 1)
-    return zip(a, b)
+    for item in ngrams(iterable, 2, **kwargs):
+        yield item
 
 
-def ngrams(iterable: Iterator[str], n: int) -> Iterator[Tuple[str, ...]]:
-    ''' Create n-grams form an interable
-    i -> (i_0, i_1, ..., i_n), (i_1, i_2, ..., i_n+1),  ...
-
-    Example:
-       > for ngram in ngrams(['all', 'this', 'happened', 'more', 'or', 'less'], 3):
-    ...:     print(ngram)
-
-    ('all', 'this', 'happened')
-    ('this', 'happened', 'more')
-    ('happened', 'more', 'or')
-    ('more', 'or', 'less')
-    '''
-    iters = tee(iterable, n)
-    for skip, i in enumerate(iters):
-        consume(i, skip)
-
-    return zip(*iters)
+def trigrams(iterable: Iterator[str], **kwargs) -> Iterator[Tuple[str, str, str]]:
+    ''' Return trigrams generated from a sequence '''
+    for item in ngrams(iterable, 3, **kwargs):
+        yield item
