@@ -193,13 +193,13 @@ class NgramModel(LanguageModel):
 
 
 class BigramModel(NgramModel):
-    ''' Convinience wrapper '''
+    ''' Convenience wrapper '''
     def __init__(self):
         super().__init__(2)
 
 
 class TrigramModel(NgramModel):
-    ''' Convinience wrapper '''
+    ''' Convenience wrapper '''
     def __init__(self):
         super().__init__(3)
 
