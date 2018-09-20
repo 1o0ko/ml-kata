@@ -134,7 +134,6 @@ class NgramModel(LanguageModel):
                 self.model[tuple(hist)][word] += 1
 
         # Let's transform the counts to probabilities
-        # TODO: add smoothing
         for hist in self.model:
             total_count = float(sum(self.model[hist].values()))
             for word in self.model[hist]:

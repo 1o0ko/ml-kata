@@ -6,7 +6,7 @@ import heapq
 
 from nltk.corpus import reuters
 from nltk import trigrams
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 START = '<START>'
 END = '<END>'
@@ -15,11 +15,10 @@ END = '<END>'
 class TriGramModel(object):
     def fit(self, corpus):
         # dict of dicts
-        self.model = defaultdict(lambda: defaultdict(lambda: 0))
+        self.model = defaultdict(lambda: defaultdict(float))
 
         for sentence in corpus.sents():
-            for w1, w2, w3 in trigrams(
-                sentence + [END], pad_left=True, left_pad_symbol=START):
+            for w1, w2, w3 in trigrams(sentence + [END], pad_left=True, left_pad_symbol=START):
                 self.model[(w1, w2)][w3] += 1
 
         # Let's transform the counts to probabilities
