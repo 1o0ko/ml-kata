@@ -2,8 +2,9 @@
 Repository containing sketches/brain-dead simple implementations of various ML algorithms or parts of therof.
 
 ## NLP
-* [Bigram and Trigam language model with random sampling](language_models.py)
-* [Beam search with trigram language model](beam_search.py)
+* [n-gram generation with iterators](./nlp/ngrams.py)
+* [Bigram and Trigam language model with random sampling](./nlp/language_models.py)
+* [Beam search with trigram language model](./nlp/beam_search.py)
 * [Byte Pair Endoding](byte_pair_encoding.py) for further experiments with character-level language models
 * [Forward pass of a char-CNN embedding](char-cnn-sketch.py)
 
