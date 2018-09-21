@@ -31,15 +31,11 @@ class LanguageModel(abc.ABC):
 
         [(t_1, p(t_1)), ... , (t_N, p(t_N))]
         '''
-
         pass
 
-    def __check(self, sentence):
-        if isinstance(sentence, str):
-            sentence = sentence.split()
-        elif not isinstance(sentence, list):
-            raise ValueError("Not a sting or list!")
-        return sentence
+    @abc.abstractmethod
+    def conditional_probs(self, sentence):
+        pass
 
     def prob(self, sentence):
         ''' Calculates probability of the sentence W = (w_1, ..., w_N)
@@ -60,6 +56,13 @@ class LanguageModel(abc.ABC):
         sentence = self.__check(sentence)
         return np.power(1 / self.prob(sentence), 1 / len(sentence))
 
+    def __check(self, sentence):
+        if isinstance(sentence, str):
+            sentence = sentence.split()
+        elif not isinstance(sentence, list):
+            raise ValueError("Not a sting or list!")
+        return sentence
+
 
 class UnigramModel(LanguageModel):
 
@@ -78,6 +81,10 @@ class UnigramModel(LanguageModel):
     def probs(self, sentence):
         '''Returns list of tuples of (word, it's probability)'''
         return [(word, self.prob_word(word)) for word in sentence]
+
+    def conditional_probs(self, sentence):
+        *hist, word = sentence
+        return self.prob_word(word)
 
     def prob_word(self, word):
         ''' calculate the probability of a word '''
@@ -173,7 +180,6 @@ class NgramModel(LanguageModel):
                 for n in ngrams(sentence, self.n, pad_left=True)]
 
     def conditional_probs(self, sentence):
-
         return self.model[self.__prepare(sentence)].items()
 
     def __prepare(self, sentence):
