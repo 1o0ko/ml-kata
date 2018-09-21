@@ -3,6 +3,7 @@ import random
 import numpy as np
 
 from collections import Counter, defaultdict
+from itertools import chain
 from typing import List, Optional
 
 from data import corpora
@@ -170,6 +171,29 @@ class NgramModel(LanguageModel):
         '''
         return [(n, self.prob_ngram(n))
                 for n in ngrams(sentence, self.n, pad_left=True)]
+
+    def conditional_probs(self, sentence):
+
+        return self.model[self.__prepare(sentence)].items()
+
+    def __prepare(self, sentence):
+        ''' cuts or padds sentence '''
+        # use markov property
+        hist_size = self.n - 1
+        hist = sentence[-hist_size:]
+
+        # pad left if histoty is to small
+        if len(hist) < hist_size:
+            hist = chain((None,) * (hist_size - len(hist)), hist)
+
+        return tuple(hist)
+
+    def __contains__(self, sentence):
+        last_ngram = self.__prepare(sentence)
+        if self.model[last_ngram]:
+            return True
+        else:
+            return False
 
 
 class BigramModel(NgramModel):

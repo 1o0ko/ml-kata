@@ -89,11 +89,7 @@ def beamsearch(
                             sequence_prob * next_prob, True, sequence)
                     else:
                         curr_beam.add(
-                            sequence_prob *
-                            next_prob,
-                            False,
-                            sequence +
-                            [next_word])
+                            sequence_prob * next_prob, False, sequence + [next_word])
 
         (best_prob, best_complete, best_sequence) = max(curr_beam)
         if best_complete or len(best_sequence) - 2 == clip_len:
