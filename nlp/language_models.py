@@ -3,32 +3,13 @@ import random
 import numpy as np
 
 from collections import Counter, defaultdict
-from itertools import chain
 from typing import List, Optional
 
+from data import corpora
 from nlp.ngrams import ngrams
 
 Token = Optional[str]
 Seed = Optional[List[Token]]
-
-
-class Corpus(object):
-    ''' Corpus object '''
-    def __init__(self, sentences):
-        self._sentences = [
-            s.split() if isinstance(s, str) else s for s in sentences]
-        self._words = list(chain.from_iterable(self._sentences))
-
-    @property
-    def words(self):
-        return self._words
-
-    @property
-    def sents(self):
-        return self._sentences
-
-    def __add__(self, other):
-        return Corpus(chain(self.sents, other.sents))
 
 
 class LanguageModel(abc.ABC):
@@ -82,8 +63,8 @@ class LanguageModel(abc.ABC):
 class UnigramModel(LanguageModel):
 
     def fit(self, corpus):
-        self.model = Counter(corpus.words)
-        self.total_count = len(corpus.words)
+        self.model = Counter(corpus.words())
+        self.total_count = len(corpus.words())
 
         for word in self.model:
             self.model[word] /= float(self.total_count)
@@ -129,7 +110,7 @@ class NgramModel(LanguageModel):
         # for unigram back-off
         self.unigram_lm.fit(corpus)
 
-        for sentence in corpus.sents:
+        for sentence in corpus.sents():
             for *hist, word in ngrams(sentence, self.n, pad_right=True, pad_left=True):
                 self.model[tuple(hist)][word] += 1
 
@@ -204,15 +185,7 @@ class TrigramModel(NgramModel):
 
 
 if __name__ == '__main__':
-    corpus = Corpus([
-        'this is a sentence',
-        'this sentence is long',
-        'fishes like to swim',
-        'Brown corpus is a resource',
-        'I like listening to music',
-        'I like reading music books',
-        'this is a really long sentence'
-    ])
+    corpus = corpora.simple
 
     print('Training unigram  LM')
     unigram_lm = UnigramModel()
