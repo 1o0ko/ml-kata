@@ -66,7 +66,7 @@ class Beam(object):
 
 
 def beamsearch(
-        probabilities_function,
+        probabilities_fn,
         seed=[START, START],
         beam_width=10, clip_len=-1,
         end_token=END):
@@ -82,8 +82,7 @@ def beamsearch(
             if complete:
                 curr_beam.add(sequence_prob, True, sequence)
             else:
-                for i, (next_word, next_prob) in enumerate(
-                        probabilities_function(sequence)):
+                for i, (next_word, next_prob) in enumerate(probabilities_fn(sequence)):
                     if next_word == end_token:
                         curr_beam.add(
                             sequence_prob * next_prob, True, sequence)
