@@ -57,10 +57,10 @@ def main():
                     [0.1, 0.2, 0.3, 0.4, 0.5],
                     [0.5, 0.4, 0.3, 0.2, 0.1]])
 
-    print("Gredy decoder")
+    print("Greedy decoder:")
     print(greedy_decoder(data))
 
-    print("Beam search")
+    print("Beam search:")
     print(beam_search_decoder(data, 3, verbose=True))
 
 
