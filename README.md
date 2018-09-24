@@ -13,6 +13,7 @@ Repository containing sketches/brain-dead simple implementations of various ML a
 
 ## CV
 * [Convolve an image with a filter](convolve.py)
+* [CNN forward pass with vectorized convolution op](cnn.py)
 
 # 'Frameworky' examples
 ## NLP
