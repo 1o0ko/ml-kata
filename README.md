@@ -3,8 +3,9 @@ Repository containing sketches/brain-dead simple implementations of various ML a
 
 # Standalone examples
 ## NLP
-* [Beam search with trigram language model](./beam_search.py) (a pedagogical implementation)
-* [Byte Pair Encoding](./byte_pair_encoding.py) for further experiments with character-level language models
+* [Beam search with trigram language model](./nlp/beam_search_simple.py) (a pedagogical implementation.)
+* [Beam search with fixed data](./nlp/beam_search_numpy.py) (a pedagogical implementation with numpy.)
+* [Byte Pair Encoding](./nlp/byte_pair_encoding.py) for further experiments with character-level language models
 * [Forward pass of a char-CNN embedding](./char-cnn-sketch.py)
 
 ## ML
