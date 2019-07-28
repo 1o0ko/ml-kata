@@ -26,7 +26,8 @@ def pad_sequence(sequence, n, pad_left=False, pad_right=False,
     return sequence
 
 
-def ngrams(iterable: Iterator[str], n: int,
+def ngrams(iterable: Iterator[str],
+           n: int,
            pad_left: bool = False,
            pad_right: bool = False,
            left_pad_symbol: Optional[str] = None,

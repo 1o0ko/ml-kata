@@ -12,6 +12,14 @@ from nlp.ngrams import ngrams
 Token = Optional[str]
 Seed = Optional[List[Token]]
 
+START = '<START>'
+END = '<END>'
+
+
+def initialize_dict():
+    dictionary = defaultdict(float)
+    dictionary[END] = 0.0
+    return dictionary
 
 class LanguageModel(abc.ABC):
     def __call__(self, sentence):
@@ -22,7 +30,9 @@ class LanguageModel(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def sample(self, k=10):
+    def sample(self,
+               text: Optional[List[Token]] = None,
+               k: int =10):
         pass
 
     @abc.abstractmethod
@@ -75,7 +85,7 @@ class UnigramModel(LanguageModel):
 
         self.min_prob = min(self.model.values())
 
-    def sample(self, k=10):
+    def sample(self, text = None, k=10):
         return ' '.join([self.sample_one_word() for _ in range(k)])
 
     def probs(self, sentence):
@@ -111,7 +121,7 @@ class NgramModel(LanguageModel):
             raise ValueError("n should be greater than 1")
 
         self.unigram_lm = UnigramModel()
-        self.model = defaultdict(lambda: defaultdict(float))
+        self.model = defaultdict(initialize_dict)
         self.n = n
 
     def fit(self, corpus):
@@ -119,7 +129,9 @@ class NgramModel(LanguageModel):
         self.unigram_lm.fit(corpus)
 
         for sentence in corpus.sents():
-            for *hist, word in ngrams(sentence, self.n, pad_right=True, pad_left=True):
+            for *hist, word in ngrams(sentence, self.n,
+                                      pad_right=True, right_pad_symbol=END,
+                                      pad_left=True, left_pad_symbol=START):
                 self.model[tuple(hist)][word] += 1
 
         # Let's transform the counts to probabilities
@@ -133,7 +145,7 @@ class NgramModel(LanguageModel):
                k: Optional[int] = None):
         ''' Greedy sampling from a ngram model '''
         # Initialize context
-        text = text if text else [None] * (self.n - 1)
+        text = text if text else [START] * (self.n - 1)
         sentence_finished = False
 
         while not sentence_finished:
@@ -152,14 +164,13 @@ class NgramModel(LanguageModel):
                 text.append(".")
                 sentence_finished = True
 
-            if text[-(self.n - 1):] == [None] * (self.n - 1):
+            if text[-(self.n - 1):] == [END] * (self.n - 1):
                 sentence_finished = True
 
         return ' '.join([t for t in text if t])
 
     def prob_ngram(self, ngram):
-        ''' P(t_n | t_(n-1), ..., t_1) with unigram back-off
-        '''
+        ''' P(t_n | t_(n-1), ..., t_1) with unigram back-off. '''
         *hist, word = ngram
         probs = self.model.get(tuple(hist), None)
         if probs and word in probs:
@@ -168,7 +179,7 @@ class NgramModel(LanguageModel):
         return self.unigram_lm(word)
 
     def probs(self, sentence):
-        ''' List of tuples: trigram, it's probability with unigram back-off
+        ''' List of tuples: ngram, it's probability with unigram back-off
 
         [
          ((w_1,        w_2,        ..., w_n), P(w_n | w_(n-1), ..., w_1)), ... ,
@@ -176,8 +187,9 @@ class NgramModel(LanguageModel):
          ((w_(N-(n-1), w_(N-(n-2), ..., w_N), P(w_n | w_(n-1), ..., w_1)), ... ,
         ]
         '''
-        return [(n, self.prob_ngram(n))
-                for n in ngrams(sentence, self.n, pad_left=True)]
+        return [(n, self.prob_ngram(n)) for n in ngrams(sentence, self.n,
+                                                        pad_left=True,
+                                                        left_pad_symbol=START)]
 
     def conditional_probs(self, sentence):
         return self.model[self.__prepare(sentence)].items()
@@ -190,7 +202,7 @@ class NgramModel(LanguageModel):
 
         # pad left if histoty is to small
         if len(hist) < hist_size:
-            hist = chain((None,) * (hist_size - len(hist)), hist)
+            hist = chain((START,) * (hist_size - len(hist)), hist)
 
         return tuple(hist)
 
@@ -234,7 +246,7 @@ if __name__ == '__main__':
     trigram_lm.fit(corpus)
 
     print('\tA sample from the model:', trigram_lm.sample())
-    print('\tA sample from the model:', trigram_lm.sample(text=[None, 'I']))
+    print('\tA sample from the model:', trigram_lm.sample(text=[START, 'I']))
 
     hi_p_sent = 'This is a sentence'
     lo_p_sent = 'Fishes like brown music'

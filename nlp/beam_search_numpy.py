@@ -45,7 +45,7 @@ def beam_search_decoder(data, k, verbose=False):
 
 
 def main():
-    # define a sequence of 10 words over a vocab of 5 words
+    # define a sequence of 10 words over a vocab of 5 words T x |V|.
     data = np.array([[0.1, 0.2, 0.3, 0.4, 0.5],
                     [0.5, 0.4, 0.3, 0.2, 0.1],
                     [0.1, 0.2, 0.3, 0.4, 0.5],

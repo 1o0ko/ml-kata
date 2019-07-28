@@ -1,36 +1,40 @@
 import heapq
+import numpy as np
 
 from data import corpora
-from nlp.language_models import TrigramModel
+from nlp.language_models import TrigramModel, Token, Seed, START, END
 
-from typing import List, Optional
+from typing import Callable, List, Optional, Tuple, Union
 
-END = None
+TokenScore = Tuple[Token, float]
+SequenceScore = Tuple[List[Token], float]
 
 
 def greedy(
-        lm,
-        seed: List[str],
-        end_token: str = END,
-        limit: Optional[int] = None):
+    prob_fn: Callable[[List[Token]], List[TokenScore]],
+    seed: List[Token],
+    end_token: Token = END,
+    limit: Optional[int] = None) -> SequenceScore:
     '''
-    Geedily Finish the sentence given the seed
+    Geedily finish the sentence given the seed and probability function.
     '''
     text, prefix_len = seed, len(seed)
+    text_probs = []
     while True:
-        probs = lm.conditional_probs(text)
-        if not probs:
-            break
-
-        next_word, _ = max(probs, key=lambda x: x[1])
+        probs = prob_fn(text)
+        next_word, prob = max(prob_fn(text), key=lambda x: x[1])
         if next_word == END:
-            break
+            text_probs.append(1e-20); break
 
         text.append(next_word)
+        text_probs.append(prob)
         if limit and len(text) - prefix_len >= limit:
             break
 
-    return text[prefix_len:], lm(text[prefix_len:])
+    # Use sum-log trick for numerical stability.
+    text_score = np.exp(np.sum(np.log(text_probs)))
+
+    return text[prefix_len:], text_score
 
 
 class Beam(object):
@@ -59,18 +63,14 @@ class Beam(object):
 
 
 def beamsearch(
-        lm,
-        seed: List[str],
-        end_token: str = END,
-        limit: Optional[int] = None,
-        beam_width: int = 10):
+    prob_fn: Callable[[List[Token]], List[TokenScore]],
+    seed: List[Token],
+    end_token: Token = END,
+    limit: Optional[int] = None,
+    beam_width: int = 10) -> SequenceScore:
     '''
     Finish the sentence given the seed
     '''
-    # currently we're not using smoothing
-    if seed not in lm:
-        return (seed, 0.0)
-
     prefix_len = len(seed)
     prev_beam = Beam(beam_width)
     prev_beam.add(1.0, False, seed)
@@ -82,15 +82,14 @@ def beamsearch(
             if complete:
                 curr_beam.add(sequence_prob, True, sequence)
             else:
-                for next_word, next_prob in lm.conditional_probs(sequence):
+                for next_word, next_prob in prob_fn(sequence):
                     if next_word == end_token:
-                        curr_beam.add(
-                            sequence_prob * next_prob, True, sequence)
+                        curr_beam.add(sequence_prob * next_prob, True, sequence)
                     else:
-                        curr_beam.add(
-                            sequence_prob * next_prob, False, sequence + [next_word])
+                        curr_beam.add(sequence_prob * next_prob, False, sequence + [next_word])
 
-        (best_prob, best_complete, best_sequence) = max(curr_beam)
+            best_prob, best_complete, best_sequence = max(curr_beam)
+
         if best_complete or len(best_sequence) - prefix_len == limit:
             return (best_sequence[prefix_len:], best_prob)
 
@@ -102,12 +101,15 @@ if __name__ == '__main__':
     lm = TrigramModel()
     lm.fit(corpora.simple)
 
-    print(greedy(lm, seed=[None, None], limit=None))
-    print(greedy(lm, seed=['I']))
-    print(greedy(lm, seed=['I', 'like'], limit=3))
-    print(greedy(lm, seed=['I', 'like', 'trains'], limit=3))
+    prob_fn = lambda text: lm.conditional_probs(text)
+    print("Greedy.")
+    print(greedy(prob_fn, seed=[START, START], limit=None))
+    print(greedy(prob_fn, seed=['I']))
+    print(greedy(prob_fn, seed=['I', 'like'], limit=3))
+    print(greedy(prob_fn, seed=['I', 'like', 'trains'], limit=3))
 
-    print(beamsearch(lm, seed=[None, None], limit=None))
-    print(beamsearch(lm, seed=['I']))
-    print(beamsearch(lm, seed=['I', 'like'], limit=3))
-    print(beamsearch(lm, seed=['I', 'like', 'trains'], limit=3))
+    print("Beam search.")
+    print(beamsearch(prob_fn, seed=[START, START], limit=None))
+    print(beamsearch(prob_fn, seed=['I']))
+    print(beamsearch(prob_fn, seed=['I', 'like'], limit=3))
+    print(beamsearch(prob_fn, seed=['I', 'like', 'trains'], limit=3))
